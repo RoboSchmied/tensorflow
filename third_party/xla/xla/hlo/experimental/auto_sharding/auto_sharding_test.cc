@@ -59,7 +59,7 @@ using ::testing::UnorderedElementsAre;
 using DummyAutoShardingTest = HloTestBase;
 
 TEST_F(DummyAutoShardingTest, ReplicatedShardingDummy) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 ENTRY %elementwise {
   %param0 = f32[5,7,11,13]{3,2,1,0} parameter(0)
@@ -163,7 +163,7 @@ ENTRY %elementwise {
 };
 
 TEST_F(AutoShardingTest, DISABLED_ElementWiseOperator) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 ENTRY %elementwise {
   %param0 = f32[128,128]{0,1} parameter(0)
@@ -189,7 +189,7 @@ ENTRY %elementwise {
 }
 
 TEST_F(AutoShardingTest, Unsupported3DShardingTest) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 ENTRY %elementwise {
   %param0 = f32[32,32,32,32] parameter(0)
@@ -211,7 +211,7 @@ ENTRY %elementwise {
 }
 
 TEST_F(AutoShardingTest, NDIterativeSolveTest) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %elementwise {
@@ -240,7 +240,7 @@ ENTRY %elementwise {
 }
 
 TEST_F(AutoShardingTest, SliceDeviceMeshTest) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %elementwise {
@@ -252,13 +252,13 @@ ENTRY %elementwise {
   TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<VerifiedHloModule> module,
                           ParseAndReturnVerifiedModule(hlo_string));
   TF_ASSERT_OK_AND_ASSIGN(
-      bool changed,
-      AutoSharding(/* option */ {.enable = true,
-                                 .solve_nd_sharding_iteratively = true,
-                                 .device_mesh_shape = {2, 2},
-                                 .device_mesh_alpha = {1.0, 1.0},
-                                 .device_mesh_beta = {0.01, 1.0}})
-          .Run(module.get()));
+      bool changed, AutoSharding(/* option */ AutoShardingOption{
+                                     .enable = true,
+                                     .solve_nd_sharding_iteratively = true,
+                                     .device_mesh_shape = {2, 2},
+                                     .device_mesh_alpha = {1.0, 1.0},
+                                     .device_mesh_beta = {0.01, 1.0}})
+                        .Run(module.get()));
   VLOG(10) << module->ToString();
   EXPECT_TRUE(changed);
   const HloInstruction* slice = FindInstruction(module.get(), "slice");
@@ -269,8 +269,36 @@ ENTRY %elementwise {
             op::Sharding("{devices=[2,1,2]0,2,1,3 last_tile_dim_replicate}")));
 }
 
+TEST_F(AutoShardingTest, UserShardingTest) {
+  constexpr absl::string_view kHloString = R"(
+HloModule module
+
+ENTRY %elementwise {
+  concatenate.76306 = bf16[1,4096,8,256]{3,2,1,0} parameter(0)
+  constant.15158 = bf16[] constant(0)
+  pad.70 = bf16[1,4352,8,256]{3,2,1,0} pad(concatenate.76306, constant.15158), padding=0_0x0_256x0_0x0_0, sharding={devices=[1,1,128,1]<=[128]}
+  ROOT copy.45 = bf16[1,4352,8,256]{3,2,1,0} copy(pad.70)
+})";
+
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<VerifiedHloModule> module,
+                          ParseAndReturnVerifiedModule(hlo_string));
+  TF_ASSERT_OK_AND_ASSIGN(
+      bool changed,
+      AutoSharding(
+          /* option */ AutoShardingOption{
+              .enable = true,
+              .preserve_shardings =
+                  AutoShardingOption::PreserveShardingsType::kKeepAllShardings,
+              .device_mesh_shape = {128, 1},
+              .device_mesh_alpha = {1.0, 1.0},
+              .device_mesh_beta = {0.01, 1.0}})
+          .Run(module.get()));
+  VLOG(10) << module->ToString();
+  EXPECT_TRUE(changed);
+}
+
 TEST_F(AutoShardingTest, RngBitGeneratorArrayInput) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule rng_bit_generator
 
 ENTRY %RngBitGenerator (p0: u64[2]) -> (u64[2], u32[16,16]) {
@@ -295,7 +323,7 @@ ENTRY %RngBitGenerator (p0: u64[2]) -> (u64[2], u32[16,16]) {
 }
 
 TEST_F(AutoShardingTest, RngBitGeneratorTupleInput) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule rng_bit_generator
 
 ENTRY %RngBitGenerator {
@@ -325,7 +353,7 @@ ENTRY %RngBitGenerator {
 }
 
 TEST_F(AutoShardingTest, DotLHSTwoNonContractingDims) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 ENTRY %entry {
   %param0 = f32[4,256,64]{2,1,0} parameter(0)
@@ -377,7 +405,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, DotRHSTwoNonContractingDims) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 ENTRY %entry {
   %param0 = f32[4,256,32]{2,1,0} parameter(0)
@@ -429,7 +457,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, DotTwoContractingDims) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 ENTRY %entry {
   %param0 = f32[4,256,64]{2,1,0} parameter(0)
@@ -470,7 +498,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, TwoMatmul) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 ENTRY twomatmul {
   parameter.1 = f32[64,64]{1,0} parameter(0)
@@ -549,7 +577,7 @@ ENTRY twomatmul {
 }
 
 TEST_F(AutoShardingTest, ProcessCustomCallShardings) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %entry {
@@ -579,7 +607,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, SaveAndRemoveShardingAnnotationKeepAll) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
@@ -633,7 +661,7 @@ ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
 
 TEST_F(AutoShardingTest,
        SaveAndRemoveShardingAnnotationKeepInputOutputSmallTensor) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
@@ -683,7 +711,7 @@ ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
 }
 
 TEST_F(AutoShardingTest, SaveAndRemoveShardingAnnotationKeepInputOutput) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
@@ -761,7 +789,7 @@ ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
 }
 
 TEST_F(AutoShardingTest, SaveAndRemoveShardingAnnotationRemoveAll) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
@@ -798,7 +826,7 @@ ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
 }
 
 TEST_F(AutoShardingTest, SaveAndRemoveShardingAnnotationRemoveAllSmallTensor) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
@@ -851,7 +879,7 @@ ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
 }
 
 TEST_F(AutoShardingTest, TupleReduceTest) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 %func (lhs_value: f32[], lhs_index: s32[], rhs_value: f32[], rhs_index: s32[]) -> (f32[], s32[]) {
   %lhs_value = f32[] parameter(0)
@@ -897,7 +925,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, ReduceTest) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 %func (x: f32[], y: f32[]) -> f32[] {
@@ -940,7 +968,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, ScatterTest2D) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 region {
@@ -979,7 +1007,7 @@ ENTRY %Scatter {
 }
 
 TEST_F(AutoShardingTest, ScatterTest3D) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 region {
@@ -1022,7 +1050,7 @@ ENTRY %Scatter {
 }
 
 TEST_F(AutoShardingTest, GatherTest) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 ENTRY %entry {
   %param0 = f32[256,1024]{0,1} parameter(0)
@@ -1053,7 +1081,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, GatherTestNoReshard) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 ENTRY %entry {
   get-tuple-element = s8[1000,128]{1,0} parameter(0)
@@ -1084,7 +1112,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, GatherConvTest) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 ENTRY %entry {
   %param0 = f32[1024,1024]{0,1} parameter(0)
@@ -1383,7 +1411,7 @@ TEST_F(AutoShardingTest, InvalidOptions) {
 
 TEST_F(AutoShardingTest, AutoShardingKeepUserShardingInputOutput) {
   // An HLO Module with sharding for all instructions.
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
@@ -1415,7 +1443,7 @@ ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
 
 TEST_F(AutoShardingTest, AutoShardingKeepUserShardingAdd) {
   // An HLO Module with sharding for all instructions.
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 ENTRY %elementwise {
   %param0 = f32[128,128]{0,1} parameter(0)
@@ -1449,7 +1477,7 @@ ENTRY %elementwise {
 
 TEST_F(AutoShardingTest, AutoShardingKeepUserShardingDot) {
   // An HLO Module with sharding for all instructions.
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
@@ -1495,7 +1523,7 @@ ENTRY %entry (param0: f32[4,256,64], param1: f32[4,256,32]) -> f32[64,32] {
 }
 
 TEST_F(AutoShardingTest, DISABLED_AutoShardingKeepUserShardingTupleReduce) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 %func (lhs_value: f32[], lhs_index: s32[], rhs_value: f32[], rhs_index: s32[]) -> (f32[], s32[]) {
   %lhs_value = f32[] parameter(0)
@@ -1543,7 +1571,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, DISABLED_TupleParameter) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 ENTRY %tupleparameter {
   %tuple_param = (f32[16,32,64]{2,1,0}, f32[16,32,64]{2,1,0}) parameter(0)
@@ -1573,7 +1601,7 @@ ENTRY %tupleparameter {
 
 // CRASHES
 TEST_F(AutoShardingTest, DISABLED_GetTupleElementWithUserShardingTest) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 %while_cond {
@@ -1620,7 +1648,7 @@ ENTRY %entry (param0: f32[16,256,256], param1: f32[16,256,256]) -> f32[16,256,25
 }
 
 TEST_F(AutoShardingTest, While) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 %cond {
@@ -1700,7 +1728,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, DynamicSlice) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 ENTRY %entry {
   %param0 = s32[] parameter(0)
@@ -1729,7 +1757,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, Alias) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module, input_output_alias={ {0}: (0, {}, may-alias), {1}: (1, {}, may-alias), {2}: (2, {}, may-alias), {3}: (3, {}, may-alias)}
 
 ENTRY %entry {
@@ -1755,7 +1783,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, AliasTupleParameter) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module, input_output_alias={ {0}: (0, {0}, may-alias), {1}: (0, {1}, may-alias), {2}: (0, {2}, may-alias), {3}: (0, {3}, may-alias)}
 
 ENTRY %entry {
@@ -1782,7 +1810,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, JaxRandomUniform) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 clone {
   lhs.1 = u32[] parameter(0)
@@ -1833,7 +1861,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, Reshape) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %entry {
@@ -1861,7 +1889,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, ReshapeWithInvalidUserSharding) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %entry {
@@ -1887,7 +1915,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, Broadcast) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %entry {
@@ -1906,7 +1934,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, TestReshardingCostsForUserAnnotatedSharding) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module
 
 ENTRY %entry {
@@ -1932,7 +1960,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, AllowAliasToFollowerConversion) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module, input_output_alias={ {0}: (0, {}, may-alias), {1}: (1, {}, may-alias), {2}: (2, {}, may-alias), {3}: (3, {}, may-alias)}
 
 ENTRY %entry {
@@ -1959,7 +1987,7 @@ ENTRY %entry {
 }
 
 TEST_F(AutoShardingTest, DisallowAliasToFollowerConversion) {
-  constexpr absl::string_view hlo_string = R"(
+  constexpr absl::string_view kHloString = R"(
 HloModule module, input_output_alias={ {0}: (0, {}, may-alias), {1}: (1, {}, may-alias), {2}: (2, {}, may-alias), {3}: (3, {}, may-alias)}
 
 ENTRY %entry {
