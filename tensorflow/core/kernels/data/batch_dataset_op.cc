@@ -32,6 +32,7 @@ limitations under the License.
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/stringprintf.h"
 #include "tensorflow/core/util/batch_util.h"
+#include "tsl/platform/logging.h"
 #include "tsl/platform/mutex.h"
 
 namespace tensorflow {
@@ -216,8 +217,30 @@ class BatchDatasetOp::Dataset : public DatasetBase {
                                                   end_of_sequence));
           if (!*end_of_sequence) {
             batch_elements.emplace_back(std::move(batch_element_tuple));
-          } else {
+          } else if (ctx->index_mapper() == nullptr) {
             input_impl_.reset();
+          }
+        }
+
+        if (*end_of_sequence && ctx->index_mapper() != nullptr) {
+          // When not dropping the remainder and global shuffling is enabled,
+          // the input iterator may return `end_of_sequence` for the elements in
+          // the last batch, but before the input iterator is exhausted. When
+          // this happens, we skip the remainder of the current batch, which
+          // should all be `end_of_sequence`.
+          //
+          // For example, when global shuffling
+          // range(10).batch(3, drop_remainder=False),
+          // the result may be
+          // [[3, 4, 5], [9], [0, 1, 2], [6, 7, 8]]. The input iterator returns
+          // `end_of_sequence` after returning 9, and the batch op should skip
+          // the next two elements instead of returning `end_of_sequence`.
+          for (int i = batch_elements.size(); i < dataset()->batch_size_ - 1;
+               ++i) {
+            std::vector<Tensor> skipped;
+            TF_RETURN_IF_ERROR(input_impl_->GetNext(ctx_with_index_mapper.Get(),
+                                                    &skipped, end_of_sequence));
+            DCHECK(*end_of_sequence);
           }
         }
         ctx_with_index_mapper.MergeCheckpoint();

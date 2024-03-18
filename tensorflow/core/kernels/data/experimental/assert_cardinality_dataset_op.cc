@@ -122,6 +122,11 @@ class AssertCardinalityDatasetOp::Dataset : public DatasetBase {
         num_elements_++;
       }
       if (*end_of_sequence && num_elements_ != dataset()->cardinality_) {
+        if (ctx->index_mapper()) {
+          return errors::FailedPrecondition(
+              "Input dataset was expected to contain ",
+              ElementString(dataset()->cardinality_), ".");
+        }
         return errors::FailedPrecondition(
             "Input dataset was expected to contain ",
             ElementString(dataset()->cardinality_), " but contained only ",

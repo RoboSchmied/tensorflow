@@ -15,7 +15,6 @@
 # ==============================================================================
 """Tests for `tf.data.Dataset.batch()`."""
 
-import math
 import time
 from typing import Callable, Optional
 
@@ -461,11 +460,11 @@ class BatchGlobalShuffleTest(test_base.DatasetTestBase, parameterized.TestCase):
     dataset = dataset.batch(batch_size, drop_remainder=drop_remainder)
     dataset = dataset.prefetch(buffer_size=dataset_ops.AUTOTUNE)
     dataset = global_shuffle_op._global_shuffle(dataset)
-    dataset = dataset.map(lambda x: x[0])
+    dataset = dataset.unbatch()
 
-    expected = list(range(0, dataset_range, batch_size))
+    expected = list(range(0, dataset_range))
     if drop_remainder:
-      expected = expected[: (dataset_range // batch_size)]
+      expected = expected[: (dataset_range // batch_size) * batch_size]
     dataset_output = self.getDatasetOutput(
         dataset, requires_initialization=True)
     self.assertCountEqual(dataset_output, expected)
@@ -492,12 +491,12 @@ class BatchGlobalShuffleTest(test_base.DatasetTestBase, parameterized.TestCase):
     dataset = dataset.prefetch(buffer_size=dataset_ops.AUTOTUNE)
     dataset = global_shuffle_op._global_shuffle(
         dataset, seed=seed, reshuffle_each_iteration=reshuffle)
-    dataset = dataset.map(lambda x: x[0])
     dataset = dataset.repeat(2)
+    dataset = dataset.unbatch()
 
-    expected = list(range(0, dataset_range, batch_size))
+    expected = list(range(0, dataset_range))
     if drop_remainder:
-      expected = expected[: (dataset_range // batch_size)]
+      expected = expected[: (dataset_range // batch_size) * batch_size]
     len_per_iteration = len(expected)
     expected *= 2
 
@@ -537,7 +536,7 @@ class BatchGlobalShuffleCheckpointTest(checkpoint_test_base.CheckpointTestBase,
       dataset = dataset.batch(batch_size, drop_remainder=drop_remainder)
       dataset = dataset.prefetch(buffer_size=dataset_ops.AUTOTUNE)
       dataset = global_shuffle_op._global_shuffle(dataset, seed=42)
-      dataset = dataset.map(lambda x: x[0])
+      dataset = dataset.unbatch()
       options = options_lib.Options()
       options.experimental_symbolic_checkpoint = symbolic_checkpoint
       return dataset.with_options(options)
@@ -546,9 +545,9 @@ class BatchGlobalShuffleCheckpointTest(checkpoint_test_base.CheckpointTestBase,
         self,
         _build_dataset,
         num_outputs=(
-            dataset_range // batch_size
+            (dataset_range // batch_size) * batch_size
             if drop_remainder
-            else math.ceil(dataset_range / batch_size)),
+            else dataset_range),
         assert_items_equal=True)
 
   # Creating multiple iterators with the same seed is only supported in v2 API.
@@ -577,7 +576,7 @@ class BatchGlobalShuffleCheckpointTest(checkpoint_test_base.CheckpointTestBase,
       dataset = dataset.prefetch(buffer_size=dataset_ops.AUTOTUNE)
       dataset = global_shuffle_op._global_shuffle(
           dataset, seed=42, reshuffle_each_iteration=reshuffle_each_iteration)
-      dataset = dataset.map(lambda x: x[0])
+      dataset = dataset.unbatch()
       options = options_lib.Options()
       options.experimental_symbolic_checkpoint = symbolic_checkpoint
       return dataset.with_options(options)
@@ -586,9 +585,9 @@ class BatchGlobalShuffleCheckpointTest(checkpoint_test_base.CheckpointTestBase,
         self,
         _build_dataset,
         num_outputs=(
-            dataset_range // batch_size
+            (dataset_range // batch_size) * batch_size
             if drop_remainder
-            else math.ceil(dataset_range / batch_size)),
+            else dataset_range),
         assert_items_equal=reshuffle_each_iteration)
 
 

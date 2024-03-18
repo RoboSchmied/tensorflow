@@ -26,6 +26,7 @@ tf_kernel_library(
         "//tensorflow/core/data:global_shuffle_utils",
         "//tensorflow/core/data:name_utils",
         "@com_google_absl//absl/status",
+        "@local_tsl//tsl/platform:logging",
         "@local_tsl//tsl/platform:mutex",
     ],
 )
