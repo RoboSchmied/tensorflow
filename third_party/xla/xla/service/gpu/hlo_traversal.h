@@ -68,6 +68,18 @@ H AbslHashValue(H h, const HloInstructionAdaptor& m) {
                     m.instruction_->unique_id());
 }
 
+template <HloOpcode op, HloOpcode... rest>
+bool IsOneOfHloOpcode(const HloInstructionAdaptor node) {
+  if (node.opcode() == op) {
+    return true;
+  }
+  if constexpr (sizeof...(rest) == 0) {
+    return false;
+  } else {
+    return IsOneOfHloOpcode<rest...>(node);
+  }
+}
+
 class HloFusionAdaptor {
  public:
   virtual ~HloFusionAdaptor() = default;
