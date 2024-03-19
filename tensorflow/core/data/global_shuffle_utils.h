@@ -75,6 +75,10 @@ class GlobalShuffleIterator {
   absl::Status GetNext(IteratorContext* ctx, std::vector<Tensor>* out_tensors,
                        bool* end_of_sequence);
 
+  // Skips `num_to_skip` elements. This is more efficient than calling `GetNext`
+  // n times since it just needs to increment the element index.
+  void Skip(int num_to_skip, int* num_skipped);
+
   // Restores the element count.
   // REQUIRES: ctx->restored_element_count() != nullopt.
   absl::Status Restore(IteratorContext* ctx);

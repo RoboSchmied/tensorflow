@@ -70,6 +70,12 @@ absl::Status GlobalShuffleIterator::GetNext(IteratorContext* ctx,
   return absl::OkStatus();
 }
 
+void GlobalShuffleIterator::Skip(int num_to_skip, int* num_skipped) {
+  absl::MutexLock l(&mu_);
+  element_count_ += num_to_skip;
+  *num_skipped = num_to_skip;
+}
+
 absl::Status GlobalShuffleIterator::Restore(IteratorContext* ctx) {
   if (!ctx->restored_element_count().has_value()) {
     return absl::FailedPreconditionError(absl::StrCat(

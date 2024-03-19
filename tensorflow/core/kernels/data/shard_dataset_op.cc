@@ -187,7 +187,7 @@ class ShardDatasetOp::Dataset : public DatasetBase {
                                            num_to_skip, end_of_sequence,
                                            &num_skipped));
       next_index_ += num_skipped;
-      if (*end_of_sequence) {
+      if (*end_of_sequence && ctx->index_mapper() == nullptr) {
         input_impl_.reset();
         return absl::OkStatus();
       }
